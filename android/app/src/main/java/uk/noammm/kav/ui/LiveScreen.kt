@@ -48,6 +48,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import uk.noammm.kav.KavModel
 import uk.noammm.kav.LOCATION_PERMISSIONS
 import uk.noammm.kav.Prefs
@@ -68,6 +69,7 @@ import kotlin.math.roundToInt
 object Online {
     @Volatile var session: MoovitSession? = null
     // Rebuilt whenever the routing setting changes, so the next plan goes to the provider and endpoint chosen.
+    var colorMap: JSONObject = JSONObject()
     @Volatile var routingProvider: RoutingProvider = OpenTripPlannerRoutingProvider(Prefs.DEFAULT_OTP_ENDPOINT)
         private set
     @Volatile var routeWithMoovit = false
@@ -93,6 +95,7 @@ object Online {
             )
         }
         applyRouting(ctx)
+        colorMap = JSONObject(ctx.assets.open("color_map.json").bufferedReader().use { it.readText() })
     }
 
     // Reads the routing choice from the settings and replaces the provider, so changing it takes effect at once.

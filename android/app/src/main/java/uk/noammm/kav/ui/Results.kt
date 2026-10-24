@@ -556,19 +556,54 @@ private fun LineBadgeOnline(lineId: Int, shortName: String, r: Moovit.Resolved) 
     val rt = if (info != null) r.routeType(agency) else 3
     val label = shortName.ifBlank { null } ?: info?.number?.ifBlank { null }
     val plate = plateFor(rt, agency)
-    Column(
-        Modifier.clip(RoundedCornerShape(6.dp)).background(plate?.fill ?: K.badgePlate)
-            .border(1.dp, plate?.edge ?: K.borderStrong, RoundedCornerShape(6.dp)),
-    ) {
+    val agencyName = r.agencyName(agency)
+    val colorAsInt = Online.colorMap.optLong(agencyName, -1)
+
+    var color = K.accent
+
+    if (colorAsInt>0) {
+        color = Color(colorAsInt)
+    }
+    if (plate == null) {
+        Box(
+            Modifier.clip(RoundedCornerShape(6.dp))
+                .background(color)
+                .border(1.dp, K.borderStrong, RoundedCornerShape(6.dp))
+
+            ,
+        ) {
+            Row(
+                Modifier.padding(bottom = 4.dp)
+                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                    .background(K.badgePlate),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Row(Modifier.padding(start = 5.dp, end = if (label == null) 5.dp else 6.dp, top = 2.dp, bottom = 0.dp),
+                     verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AgencyMark(rt, agency, K.muted, 14.dp)
+                    if (label != null) {
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            label, fontSize = 15.sp, color = K.text, fontWeight = FontWeight.Medium,
+                            maxLines = 3, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    } else {
         Row(
-            Modifier.padding(start = 5.dp, end = if (label == null) 5.dp else 6.dp, top = 2.dp, bottom = 2.dp),
+            Modifier.clip(RoundedCornerShape(6.dp)).background(plate.fill)
+                .border(1.dp, plate.edge, RoundedCornerShape(6.dp))
+                .padding(start = 5.dp, end = if (label == null) 5.dp else 6.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AgencyMark(rt, agency, plate?.ink ?: K.muted, 14.dp)
+            AgencyMark(rt, agency, plate.ink, 14.dp)
             if (label != null) {
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    label, fontSize = 15.sp, color = plate?.ink ?: K.text, fontWeight = FontWeight.Medium,
+                    label, fontSize = 15.sp, color = plate.ink, fontWeight = FontWeight.Medium,
                     maxLines = 3, overflow = TextOverflow.Ellipsis,
                 )
             }
