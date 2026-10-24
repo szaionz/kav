@@ -55,10 +55,18 @@ internal fun routeTints(rides: List<Moovit.Leg>, r: Moovit.Resolved): List<Color
     var run = 0
     var last: Color? = null
     return rides.map { ride ->
-        val base = routeBase(ride, r)
-        run = if (base == last) (run + 1).mod(ROUTE_HUE_RUNGS) else 0
-        last = base
-        if (run == 0) base else turned(base, run)
+        val line = r.line(ride.lineId)
+        val agencyName = r.agencyName(line?.agencyId ?: -1)
+        if (agencyName==null ||
+            line?.agencyId == null ||
+            line.agencyId<0 ||
+            Online.colorMap.optLong(agencyName, -1)<0) {
+            val base = routeBase(ride, r)
+            run = if (base == last) (run + 1).mod(ROUTE_HUE_RUNGS) else 0
+            last = base
+            if (run == 0) base else turned(base, run)
+        }
+        else Color(Online.colorMap.optLong(agencyName, -1))
     }
 }
 

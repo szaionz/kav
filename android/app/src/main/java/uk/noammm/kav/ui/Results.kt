@@ -550,7 +550,7 @@ internal fun RouteStrip(it: Moovit.Itinerary, r: Moovit.Resolved) {
 }
 
 @Composable
-private fun LineBadgeOnline(lineId: Int, shortName: String, r: Moovit.Resolved) {
+fun LineBadgeOnline(lineId: Int, shortName: String, r: Moovit.Resolved) {
     val info = r.line(lineId)
     val agency = info?.agencyId ?: -1
     val rt = if (info != null) r.routeType(agency) else 3
