@@ -3,17 +3,35 @@ package uk.noammm.kav.ui
 import uk.noammm.kav.data.Moovit
 import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
-import kotlin.math.ln
 
 data class Fix(val lat: Double, val lon: Double, val accuracy: Double, val at: Long, val speed: Float = 0f)
 
 private const val FRESH_S = 150L
+private const val CDF_UNLIKELY = 0.99
+private const val CDF_REASONABLY_LIKELY = 0.5
+private const val MAX_WALKING_SPEED_M_S = 5f
 
 internal fun Fix.isFresh(now: Long) = now - at <= FRESH_S
 internal fun Fix.distanceTo(p: Pair<Double, Double>) = metres(lat, lon, p.first, p.second)
+
+internal fun Fix.rayleighCDF(p: Pair<Double,Double>): Double {
+    val distance = distanceTo(p)
+    return rayleighCDF(distance)
+}
+
+internal fun Fix.rayleighCDF(d: Double): Double {
+    return 1-exp(-(d * d)/(accuracy*accuracy))
+}
+
+internal fun Fix.rayleighCDF(path: List<Pair<Double,Double>>): Double {
+    val minDistance = distanceToPath(lat, lon, path)
+    return rayleighCDF(minDistance)
+}
+
 internal fun Fix.aboard(shape: List<Pair<Double, Double>>) =
     shape.size >= 2 && distanceToPath(lat, lon, shape) < 80 && alongPath(lat, lon, shape) >= 60
 
@@ -303,28 +321,71 @@ internal fun journeyProgress(
     if (steps.isEmpty()) return 0
     var i = current.coerceIn(0, steps.lastIndex)
     val live = fix?.takeIf { it.isFresh(now) }
-    val walks = steps.mapNotNull { (it as? Step.Walk)?.leg?.shape?.takeIf { s -> s.isNotEmpty() } }
-    if (live != null) walkedBack(steps, i, chosen, live)?.let { i = it }
+    val walks = steps.slice(i..<steps.size).mapNotNull { (it as? Step.Walk)?.leg?.shape?.takeIf { s -> s.isNotEmpty() } }
+//    if (live != null) walkedBack(steps, i, chosen, live)?.let { i = it }
     if (live != null) {
-        for (k in steps.lastIndex downTo i + 1) {
-            if (!onStep(steps[k], r, chosen, live, walks)) continue
-            if ((i until k).any { j ->
-                    steps[j] is Step.Ride && !done(steps[j], r, chosen, now, live, fix, false, walks) &&
-                        !(j == i && rideLeftBehind(steps[j] as Step.Ride, chosen, live))
-                }
-            ) continue
-            i = k
-            break
+//        for (k in steps.lastIndex downTo i + 1) {
+//            if (!onStep(steps[k], r, chosen, live, walks)) continue
+//            if ((i until k).any { j ->
+//                    steps[j] is Step.Ride && !done(steps[j], r, chosen, now, live, fix, false, walks) &&
+//                        !(j == i && rideLeftBehind(steps[j] as Step.Ride, chosen, live))
+//                }
+//            ) continue
+//            i = k
+//            break
+//        }
+        var closestStepIndex = i
+        var closestDistance = Double.MAX_VALUE
+        /* find most "likely" step (closest). this isn't necessarily the one we're convinced we've gotten to.
+        we definitely won't move back but will only move forward if there's enough statistical evidence
+         */
+        for (k in i..<steps.size) {
+            val testedStep = steps[i]
+            val stepShape = when (testedStep) {
+                is Step.Ride -> rideOf(testedStep, chosen).shape
+                is Step.Walk -> testedStep.leg.shape
+                is Step.Cycle -> testedStep.leg.shape
+                is Step.Taxi -> testedStep.leg.shape
+                is Step.Start -> continue
+                is Step.Arrive -> continue
+                is Step.Wait -> listOf(testedStep.ride.shape.firstOrNull())
+            }.mapNotNull { a->a }
+            if (stepShape.isEmpty()) continue
+
+            val distanceToStep = distanceToPath(live.lat, live.lon, stepShape)
+            if (distanceToStep<closestDistance) {
+                closestDistance = distanceToStep
+                closestStepIndex = k
+            }
         }
-    }
-    val waitForFix = fix == null && canLocate
-    while (i < steps.lastIndex) {
-        val seen = fix?.takeIf { f ->
-            (0 until i).none { j -> (steps[j] as? Step.Ride)?.let { f.at < rideOf(it, chosen).arr - 300 } == true }
+        // now progress as far as we can justify
+        var k = i
+        var step = steps[k]
+        while ((k<closestStepIndex) && (
+                    (live.rayleighCDF(step.focus))>=CDF_UNLIKELY)
+            ||(step is Step.Start) || (step is Step.Wait && live.speed > MAX_WALKING_SPEED_M_S)
+        ) {
+            // k is unlikely -> we can rule out k
+            k++
+            step = steps[k]
         }
-        if (!done(steps[i], r, chosen, now, live, seen, waitForFix, walks)) break
-        i++
+        if ((k+1<steps.size)&&(steps[k+1] is Step.Wait || steps[k+1] is Step.Arrive) && (live.rayleighCDF(steps[k+1].focus)<=CDF_REASONABLY_LIKELY)
+            )
+             {
+            k++
+        }
+
+
+        return k
     }
+//    val waitForFix = fix == null && canLocate
+//    while (i < steps.lastIndex) {
+//        val seen = fix?.takeIf { f ->
+//            (0 until i).none { j -> (steps[j] as? Step.Ride)?.let { f.at < rideOf(it, chosen).arr - 300 } == true }
+//        }
+//        if (!done(steps[i], r, chosen, now, live, seen, waitForFix, walks)) break
+//        i++
+//    }
     return i
 }
 
