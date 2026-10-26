@@ -1326,6 +1326,15 @@ object Prefs {
     fun spokenAlerts(ctx: Context): Boolean = store(ctx).getBoolean("spokenAlerts", false)
     fun setSpokenAlerts(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("spokenAlerts", on).apply()
 
+    fun stopPhotos(ctx: Context): Boolean = store(ctx).getBoolean("stopPhotos", true)
+    fun setStopPhotos(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("stopPhotos", on).apply()
+
+    fun payments(ctx: Context): Boolean = store(ctx).getBoolean("payments", true)
+    fun setPayments(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("payments", on).apply()
+
+    fun declutterUi(ctx: Context): Boolean = store(ctx).getBoolean("declutterUi", false)
+    fun setDeclutterUi(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("declutterUi", on).apply()
+
     fun twelveHour(ctx: Context): Boolean = store(ctx).getBoolean("twelveHour", false)
     fun setTwelveHour(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("twelveHour", on).apply()
 
@@ -1433,6 +1442,9 @@ object Prefs {
             .put("filtersOff", org.json.JSONArray(off))
             .put("showCo2", showCo2(ctx))
             .put("spokenAlerts", spokenAlerts(ctx))
+            .put("stopPhotos", stopPhotos(ctx))
+            .put("payments", payments(ctx))
+            .put("declutterUi", declutterUi(ctx))
             .put("twelveHour", twelveHour(ctx))
     }
 
@@ -1454,6 +1466,9 @@ object Prefs {
         o.optJSONObject("seenPlace")?.let { place(it) }?.takeIf(::inIsrael)?.let { e.putString("seenPlace", json(it).toString()) }
         if (o.has("showCo2")) e.putBoolean("showCo2", o.optBoolean("showCo2"))
         if (o.has("spokenAlerts")) e.putBoolean("spokenAlerts", o.optBoolean("spokenAlerts"))
+        if (o.has("stopPhotos")) e.putBoolean("stopPhotos", o.optBoolean("stopPhotos", true))
+        if (o.has("payments")) e.putBoolean("payments", o.optBoolean("payments", true))
+        if (o.has("declutterUi")) e.putBoolean("declutterUi", o.optBoolean("declutterUi"))
         if (o.has("twelveHour")) e.putBoolean("twelveHour", o.optBoolean("twelveHour"))
         val chosen = o.optJSONObject("filters")
         val oldOff = o.optJSONArray("filtersOff")?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() }
