@@ -16,6 +16,8 @@ private const val CDF_UNLIKELY = 0.99
 private const val CDF_REASONABLY_LIKELY = 0.5
 private const val MAX_WALKING_SPEED_M_S = 5f
 
+private const val STOP_OR_ARRIVAL_PROXIMITY_RADIUS_M = 40
+
 internal fun Fix.isFresh(now: Long) = now - at <= FRESH_S
 internal fun Fix.distanceTo(p: Pair<Double, Double>) = metres(lat, lon, p.first, p.second)
 
@@ -373,7 +375,16 @@ internal fun journeyProgress(
             k++
             step = steps[k]
         }
-        if ((k+1<steps.size)&&(steps[k+1] is Step.Wait || steps[k+1] is Step.Arrive) && (live.rayleighCDF(steps[k+1].focus)<=CDF_REASONABLY_LIKELY)
+        if (k+1 >= steps.size) return k
+        val potentialNextStep = steps[k+1]
+        val shape = when(potentialNextStep) {
+            is Step.Wait ->listOf(potentialNextStep.ride.shape.firstOrNull())
+            is Step.Arrive -> potentialNextStep.focus
+            else -> return k
+        }.filterNotNull()
+        if (shape.isEmpty()) return k
+        if (
+           (live.rayleighCDF(shape)<=CDF_REASONABLY_LIKELY || distanceToPath(live.lat, live.lon,shape )<STOP_OR_ARRIVAL_PROXIMITY_RADIUS_M)
             )
              {
             k++
