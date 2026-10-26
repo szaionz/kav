@@ -564,19 +564,7 @@ private fun BoardOption(
     val now = System.currentTimeMillis() / 1000
     Column(Modifier.fillMaxWidth().padding(vertical = K.gap2)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                Modifier.clip(RoundedCornerShape(10.dp)).background(plate?.fill ?: K.surface2)
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AgencyMark(rt, agency, plate?.ink ?: K.muted, 15.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    ride.shortName.ifBlank { null } ?: info?.number?.ifBlank { null } ?: "…",
-                    fontSize = 15.sp, color = plate?.ink ?: K.text, fontWeight = FontWeight.Medium,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp),
-                )
-            }
+            LineBadgeOnline(ride.lineId, ride.shortName, r)
             Spacer(Modifier.width(K.gap3))
             Column(Modifier.weight(1f)) {
                 Text(

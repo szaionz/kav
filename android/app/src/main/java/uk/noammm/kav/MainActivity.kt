@@ -223,6 +223,9 @@ data class RecentTrip(
 // What Moovit is told about where the user is while private search is on.
 enum class Seen { NONE, CITY, PLACE }
 
+// Who plans trips: Moovit, or an OpenTripPlanner server of the user's choosing.
+enum class RoutingSource { MOOVIT, OPEN_TRIP_PLANNER }
+
 class KavModel(net: Net? = null, ctx: Context? = null) : ViewModel() {
     var net by mutableStateOf(net)
     var netLoading by mutableStateOf(false)
@@ -297,6 +300,7 @@ class KavModel(net: Net? = null, ctx: Context? = null) : ViewModel() {
         MapFile.type = Prefs.mapType(ctx)
         seen = Prefs.seen(ctx)
         seenPlace = Prefs.seenPlace(ctx)
+        Online.applyRouting(ctx)
         Online.reset()
         T.switchTo(Prefs.lang(ctx))
     }
@@ -589,6 +593,7 @@ private fun Shell(model: KavModel) {
             } catch (e: Exception) {
                 null
             }
+            val rp = Online.openRoutingProvider()
             if (session == null) { delay(15_000L); continue }
             val needsNames = journey.trip.rides.flatMap { it.options }.any { ride ->
                 (ride.lineId > 0 && journey.resolved.line(ride.lineId) == null) ||
@@ -596,7 +601,7 @@ private fun Shell(model: KavModel) {
                     (ride.toStop > 0 && journey.resolved.stop(ride.toStop) == null)
             }
             if (needsNames) {
-                val names = withContext(Dispatchers.IO) { Moovit.hydrate(session, listOf(journey.trip), ending = true) }
+                val names = withContext(Dispatchers.IO) { Moovit.hydrate(session,rp, listOf(journey.trip), ending = true) }
                 model.activeJourney?.takeIf { it.trip == journey.trip }?.let { current ->
                     val previous = current.resolved
                     model.activeJourney = current.copy(resolved = Moovit.Resolved(
@@ -610,7 +615,7 @@ private fun Shell(model: KavModel) {
             delay(journey.resolved.pollSecs.coerceIn(15, 120) * 1000L)
             val current = model.activeJourney?.takeIf { it.trip == journey.trip } ?: break
             val refreshed = withContext(Dispatchers.IO) {
-                Moovit.refreshLive(session, listOf(current.trip), current.resolved, ending = true)
+                Moovit.refreshLive(session,rp, listOf(current.trip), current.resolved, ending = true)
             }
             // With the same refresh, so the notification and the floating window move with the server's positions too.
             val spots = withContext(Dispatchers.IO) { KavLive.tripSpots(current.trip, refreshed) }
@@ -1353,6 +1358,23 @@ object Prefs {
     fun liveFromKav(ctx: Context): Boolean = store(ctx).getBoolean("liveFromKav", false)
     fun setLiveFromKav(ctx: Context, on: Boolean) = store(ctx).edit().putBoolean("liveFromKav", on).apply()
 
+    const val DEFAULT_OTP_ENDPOINT = "https://otp.example.com/otp/transmodel/v3"
+
+    fun routingSource(ctx: Context): RoutingSource =
+        RoutingSource.entries.firstOrNull { it.name == store(ctx).getString("routingSource", null) }
+            ?: RoutingSource.OPEN_TRIP_PLANNER
+    fun setRoutingSource(ctx: Context, source: RoutingSource) =
+        store(ctx).edit().putString("routingSource", source.name).apply()
+
+    fun routingEndpoint(ctx: Context): String =
+        store(ctx).getString("routingEndpoint", null)?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_OTP_ENDPOINT
+    fun setRoutingEndpoint(ctx: Context, endpoint: String) {
+        val e = store(ctx).edit()
+        val trimmed = endpoint.trim()
+        if (trimmed.isEmpty()) e.remove("routingEndpoint") else e.putString("routingEndpoint", trimmed)
+        e.apply()
+    }
+
     private val mapTypes = MapFile.Type.entries.map { it.name.lowercase() }
     fun mapType(ctx: Context): MapFile.Type =
         MapFile.Type.entries.firstOrNull { it.name.lowercase() == store(ctx).getString("mapType", null) } ?: MapFile.Type.STANDARD
@@ -1435,6 +1457,8 @@ object Prefs {
             .put("liquidGlass", s.getBoolean("liquidGlass", true))
             .put("privateSearch", privateSearch(ctx))
             .put("liveFromKav", liveFromKav(ctx))
+            .put("routingSource", routingSource(ctx).name)
+            .put("routingEndpoint", routingEndpoint(ctx))
             .put("mapType", mapType(ctx).name.lowercase())
             .put("seen", seen(ctx).name)
             .apply { seenPlace(ctx)?.let { put("seenPlace", json(it)) } }
@@ -1458,6 +1482,12 @@ object Prefs {
         if (o.has("liquidGlass")) e.putBoolean("liquidGlass", o.optBoolean("liquidGlass"))
         if (o.has("privateSearch")) e.putBoolean("privateSearch", o.optBoolean("privateSearch"))
         if (o.has("liveFromKav")) e.putBoolean("liveFromKav", o.optBoolean("liveFromKav"))
+        o.optString("routingSource").takeIf { n -> RoutingSource.entries.any { it.name == n } }
+            ?.let { e.putString("routingSource", it) }
+        if (o.has("routingEndpoint")) {
+            val endpoint = o.optString("routingEndpoint").trim()
+            if (endpoint.isEmpty()) e.remove("routingEndpoint") else e.putString("routingEndpoint", endpoint)
+        }
         o.optString("mapType").takeIf { it in mapTypes }?.let { e.putString("mapType", it) }
         o.optString("seen").takeIf { n -> Seen.entries.any { it.name == n } }?.let { e.putString("seen", it) }
         o.optJSONObject("seenPlace")?.let { place(it) }?.takeIf(::inIsrael)?.let { e.putString("seenPlace", json(it).toString()) }
