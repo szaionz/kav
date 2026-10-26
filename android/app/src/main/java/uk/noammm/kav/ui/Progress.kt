@@ -4,6 +4,7 @@ import uk.noammm.kav.data.Moovit
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -15,6 +16,8 @@ private const val CDF_UNLIKELY = 0.99
 private const val CDF_REASONABLY_LIKELY = 0.5
 private const val MAX_WALKING_SPEED_M_S = 5f
 
+private const val STOP_OR_ARRIVAL_PROXIMITY_RADIUS_M = 40
+
 internal fun Fix.isFresh(now: Long) = now - at <= FRESH_S
 internal fun Fix.distanceTo(p: Pair<Double, Double>) = metres(lat, lon, p.first, p.second)
 
@@ -24,12 +27,15 @@ internal fun Fix.rayleighCDF(p: Pair<Double,Double>): Double {
 }
 
 internal fun Fix.rayleighCDF(d: Double): Double {
-    return 1-exp(-(d * d)/(accuracy*accuracy))
+    return 1-exp(-(d * d)/(sigma()*sigma()))
 }
 
 internal fun Fix.rayleighCDF(path: List<Pair<Double,Double>>): Double {
     val minDistance = distanceToPath(lat, lon, path)
     return rayleighCDF(minDistance)
+}
+internal fun Fix.sigma(): Double {
+    return accuracy/sqrt(-2*ln(0.32))
 }
 
 internal fun Fix.aboard(shape: List<Pair<Double, Double>>) =
@@ -369,7 +375,16 @@ internal fun journeyProgress(
             k++
             step = steps[k]
         }
-        if ((k+1<steps.size)&&(steps[k+1] is Step.Wait || steps[k+1] is Step.Arrive) && (live.rayleighCDF(steps[k+1].focus)<=CDF_REASONABLY_LIKELY)
+        if (k+1 >= steps.size) return k
+        val potentialNextStep = steps[k+1]
+        val shape = when(potentialNextStep) {
+            is Step.Wait ->listOf(potentialNextStep.ride.shape.firstOrNull())
+            is Step.Arrive -> potentialNextStep.focus
+            else -> return k
+        }.filterNotNull()
+        if (shape.isEmpty()) return k
+        if (
+           (live.rayleighCDF(shape)<=CDF_REASONABLY_LIKELY || distanceToPath(live.lat, live.lon,shape )<STOP_OR_ARRIVAL_PROXIMITY_RADIUS_M)
             )
              {
             k++
