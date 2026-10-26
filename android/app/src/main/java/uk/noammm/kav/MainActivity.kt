@@ -69,7 +69,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -1029,6 +1028,7 @@ fun hasPreciseLocation(ctx: Context): Boolean =
 val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 private const val GOOD_FIX_M = 50f
+private const val ACCURATE_LOCATION_POLL_TIME_LIMIT_MS = 1000 * 10
 private const val ROUGH_FIX_M = 75f
 private const val VIEW_FIX_M = 200f
 
@@ -1104,9 +1104,9 @@ fun requestLocationOnce(
     listener = object : LocationListenerCompat {
         override fun onLocationChanged(location: Location) {
             if (done || location.elapsedRealtimeNanos !in started..SystemClock.elapsedRealtimeNanos()) return
-            val accurate = location.hasAccuracy() && location.accuracy in 0f..GOOD_FIX_M
-            if (requireFresh && !accurate) return
-            if (accurate) stop()
+            val accurateOrTooMuchTimeHasPassedToCare = (location.hasAccuracy() && location.accuracy in 0f..GOOD_FIX_M) || (location.elapsedRealtimeNanos-started) > 1000 * ACCURATE_LOCATION_POLL_TIME_LIMIT_MS
+            if (requireFresh && !accurateOrTooMuchTimeHasPassedToCare) return
+            if (accurateOrTooMuchTimeHasPassedToCare) stop()
             offer(location, true)
         }
         override fun onProviderEnabled(provider: String) {}
