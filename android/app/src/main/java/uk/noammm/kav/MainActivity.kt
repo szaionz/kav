@@ -1039,8 +1039,8 @@ internal fun locationProviders(lm: LocationManager): List<String> {
     val available = runCatching { lm.allProviders }.getOrDefault(emptyList())
     return buildList {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
-        add(LocationManager.GPS_PROVIDER)
         add(LocationManager.NETWORK_PROVIDER)
+        add(LocationManager.GPS_PROVIDER)
     }.filter { it in available }
 }
 
@@ -1115,15 +1115,24 @@ fun requestLocationOnce(
     var any = false
     val request = LocationRequestCompat.Builder(1000L)
         .setQuality(LocationRequestCompat.QUALITY_HIGH_ACCURACY).build()
-    for (provider in locationProviders(lm)) {
-        if (!runCatching { lm.isProviderEnabled(provider) }.getOrDefault(false)) continue
+//    for (provider in locationProviders(lm)) {
+    val provider = locationProviders(lm).firstOrNull { runCatching {   lm.isProviderEnabled(it)}.getOrDefault(false) }
+//    if (!runCatching { lm.isProviderEnabled(provider) }.getOrDefault(false)) continue
+    if (provider!=null) {
         try {
-            LocationManagerCompat.requestLocationUpdates(lm, provider, request, listener, Looper.getMainLooper())
+            LocationManagerCompat.requestLocationUpdates(
+                lm,
+                provider,
+                request,
+                listener,
+                Looper.getMainLooper()
+            )
             any = true
         } catch (e: SecurityException) {
         } catch (e: IllegalArgumentException) {
         }
     }
+//    }
     if (!any) stop(failed = true)
     else {
         timeout = Runnable { stop(failed = true) }
