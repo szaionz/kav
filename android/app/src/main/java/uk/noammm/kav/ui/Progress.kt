@@ -4,6 +4,7 @@ import uk.noammm.kav.data.Moovit
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -24,12 +25,15 @@ internal fun Fix.rayleighCDF(p: Pair<Double,Double>): Double {
 }
 
 internal fun Fix.rayleighCDF(d: Double): Double {
-    return 1-exp(-(d * d)/(accuracy*accuracy))
+    return 1-exp(-(d * d)/(sigma()*sigma()))
 }
 
 internal fun Fix.rayleighCDF(path: List<Pair<Double,Double>>): Double {
     val minDistance = distanceToPath(lat, lon, path)
     return rayleighCDF(minDistance)
+}
+internal fun Fix.sigma(): Double {
+    return accuracy/sqrt(-2*ln(0.32))
 }
 
 internal fun Fix.aboard(shape: List<Pair<Double, Double>>) =
