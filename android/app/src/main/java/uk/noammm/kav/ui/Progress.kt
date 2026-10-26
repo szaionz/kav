@@ -6,8 +6,9 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+import kotlin.math.ln
 
-data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Float = 0f)
+data class Fix(val lat: Double, val lon: Double, val accuracy: Double, val at: Long, val speed: Float = 0f)
 
 private const val FRESH_S = 150L
 

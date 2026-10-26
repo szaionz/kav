@@ -140,7 +140,7 @@ private fun LineList(model: KavModel, net: Net, list: LineListState) {
     var lead by list::lead
     LaunchedEffect(Unit) {
         if (model.here == null && uk.noammm.kav.hasLocationPermission(ctx)) {
-            uk.noammm.kav.requestLocationOnce(ctx) { model.locate(it.first, it.second) }
+            uk.noammm.kav.requestLocationOnce(ctx) { lat,lon,accuracy -> model.locate(lat,lon,accuracy) }
         }
     }
     LaunchedEffect(net, endpoints, model.here, q, types) {

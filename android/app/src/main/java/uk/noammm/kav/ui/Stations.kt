@@ -72,14 +72,14 @@ private fun StationList(model: KavModel, net: Net, list: StationListState) {
     var q by model::stopQuery
     var locating by remember { mutableStateOf(false) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        if (granted.values.any { it }) { locating = true; requestLocationOnce(ctx, onFail = { locating = false }) { model.locate(it.first, it.second); locating = false } }
+        if (granted.values.any { it }) { locating = true; requestLocationOnce(ctx, onFail = { locating = false }) {lat,lon,accuracy -> model.locate(lat,lon,accuracy) ; locating = false } }
     }
     var onMap by remember { mutableStateOf(false) }
     if (onMap) {
         StopMapPicker(
             net, model.here,
             onPick = {}, onDismiss = { onMap = false },
-            onLocate = { model.locate(it.first, it.second) },
+            onLocate = { lat,lon,accuracy -> model.locate(lat,lon,accuracy) },
             onStop = { s -> onMap = false; model.stationStop = s },
         )
         return
@@ -133,7 +133,7 @@ private fun StationList(model: KavModel, net: Net, list: StationListState) {
                         Chip(if (locating) T("Locating…", "מאתרים מיקום…") else T("Use my location", "השתמשו במיקום שלי"), locating) {
                             if (hasLocationPermission(ctx)) {
                                 locating = true
-                                requestLocationOnce(ctx, onFail = { locating = false }) { model.locate(it.first, it.second); locating = false }
+                                requestLocationOnce(ctx, onFail = { locating = false }) {lat,lon,accuracy -> model.locate(lat,lon,accuracy) ; locating = false }
                             } else {
                                 ask.launch(LOCATION_PERMISSIONS)
                             }

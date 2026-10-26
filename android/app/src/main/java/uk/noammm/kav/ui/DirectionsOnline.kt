@@ -171,9 +171,9 @@ fun DirectionsOnline(model: KavModel) {
             val stop = requestLocationOnce(ctx, requireFresh = true, onFail = {
                 findingHere = false; findHereFailed = true
                 linkTrip = null
-            }) {
-                hereOrigin = it
-                model.locate(it.first, it.second)
+            }) { lat,lon,accuracy ->
+                hereOrigin = lat to lon
+                model.locate(lat,lon,accuracy)
                 findingHere = false
             }
             onDispose { stop(); findingHere = false }
@@ -628,7 +628,7 @@ fun DirectionsOnline(model: KavModel) {
             onSaveFavourites = { model.saveFavourites(ctx, it) },
             query = model.placeQuery,
             onQuery = { model.placeQuery = it },
-            onLocate = { model.locate(it.first, it.second) },
+            onLocate = {lat,lon,accuracy -> model.locate(lat,lon,accuracy) },
         )
         }
     }

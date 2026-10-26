@@ -158,7 +158,7 @@ fun PlacePicker(
     onSaveFavourites: (List<Favourite>) -> Unit,
     query: String,
     onQuery: (String) -> Unit,
-    onLocate: (Pair<Double, Double>) -> Unit = {},
+    onLocate: (Double, Double, Double) -> Unit = {a,b,c -> },
     net: Net? = null,
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -302,11 +302,11 @@ fun PlacePicker(
         locating = true; locateFailed = false
         stopLocating = requestLocationOnce(ctx, requireFresh = true, onFail = {
             if (shown) { locating = false; locateFailed = true }
-        }) {
+        }) { lat,lon,accuracy ->
             if (!shown) return@requestLocationOnce
-            onLocate(it)
+            onLocate(lat,lon,accuracy)
             locating = false
-            onMyLocation(it)
+            onMyLocation(lat to lon)
         }
     }
     val askHere = rememberLauncherForActivityResult(
@@ -471,7 +471,7 @@ fun StopMapPicker(
     here: Pair<Double, Double>?,
     onPick: (Moovit.Place) -> Unit,
     onDismiss: () -> Unit,
-    onLocate: (Pair<Double, Double>) -> Unit = {},
+    onLocate: (Double, Double, Double) -> Unit = {a,b,c->},
     allowPin: Boolean = false,
     onStop: ((Int) -> Unit)? = null,
 ) {
@@ -488,7 +488,7 @@ private fun MapPickerScreen(
     here: Pair<Double, Double>?,
     onPick: (Moovit.Place) -> Unit,
     onDismiss: () -> Unit,
-    onLocate: (Pair<Double, Double>) -> Unit,
+    onLocate: (Double, Double, Double) -> Unit,
     allowPin: Boolean,
     onStop: ((Int) -> Unit)?,
 ) {

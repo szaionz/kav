@@ -303,26 +303,26 @@ class KavModel(net: Net? = null, ctx: Context? = null) : ViewModel() {
     }
 
     // One-off positions for maps and planning; only tracked fixes move a trip's steps on.
-    fun locate(lat: Double, lon: Double) {
+    fun locate(lat: Double, lon: Double, accuracy: Double) {
         here = lat to lon
         hereAt = System.currentTimeMillis() / 1000
-        roughFix = Fix(lat, lon, hereAt)
+        roughFix = Fix(lat, lon, accuracy, hereAt)
     }
 
-    fun track(lat: Double, lon: Double, speed: Float, at: Long) {
+    fun track(lat: Double, lon: Double, accuracy: Double,  speed: Float, at: Long) {
         here = lat to lon
         hereAt = at
-        fix = Fix(lat, lon, at, speed)
+        fix = Fix(lat, lon,accuracy, at, speed)
     }
 
     // A one-off or rough position can guide the camera without advancing the trip's steps.
     var roughFix by mutableStateOf<Fix?>(null)
         private set
 
-    fun glimpse(lat: Double, lon: Double, speed: Float, at: Long) {
+    fun glimpse(lat: Double, lon: Double, accuracy: Double, speed: Float, at: Long) {
         here = lat to lon
         hereAt = at
-        roughFix = Fix(lat, lon, at, speed)
+        roughFix = Fix(lat, lon,accuracy, at, speed)
     }
 
     // Recent enough to plan a trip from.
@@ -516,7 +516,7 @@ private fun Shell(model: KavModel) {
     val askLocation = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
-        if (granted.values.any { it }) requestLocationOnce(ctx) { model.locate(it.first, it.second) }
+        if (granted.values.any { it }) requestLocationOnce(ctx) { lat, lon, accuracy -> model.locate(lat, lon, accuracy) }
     }
     LaunchedEffect(Unit) {
         if (!hasPreciseLocation(ctx)) askLocation.launch(LOCATION_PERMISSIONS)
@@ -524,7 +524,7 @@ private fun Shell(model: KavModel) {
     val shellLifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(shellLifecycle) {
         shellLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            if (hasLocationPermission(ctx)) requestLocationOnce(ctx) { model.locate(it.first, it.second) }
+            if (hasLocationPermission(ctx)) requestLocationOnce(ctx) { lat,lon,accuracy-> model.locate(lat,lon,accuracy) }
             // The trip service can only start tracking while the app is in front.
             if (model.activeJourney != null) TripService.show(ctx)
         }
@@ -630,8 +630,8 @@ private fun Shell(model: KavModel) {
     LaunchedEffect(journeyActive, lifecycle) {
         if (!journeyActive) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            val stop = trackLocation(ctx, onFix = { model.track(it.latitude, it.longitude, it.speed, it.fixTime()) },
-                onRough = { model.glimpse(it.latitude, it.longitude, it.speed, it.fixTime()) })
+            val stop = trackLocation(ctx, onFix = { model.track(it.latitude, it.longitude, it.accuracy.toDouble(),it.speed, it.fixTime()) },
+                onRough = { model.glimpse(it.latitude, it.longitude, it.accuracy.toDouble(),it.speed, it.fixTime()) })
             try { awaitCancellation() } finally { stop() }
         }
     }
@@ -668,7 +668,7 @@ private fun Shell(model: KavModel) {
         if (model.restored) {
             TripBridge.end = { model.activeJourney = null }
             TripBridge.journey = { model.activeJourney?.let { it to model.journeyStep } }
-            TripBridge.fix = { model.track(it.lat, it.lon, it.speed, it.at) }
+            TripBridge.fix = { model.track(it.lat, it.lon, it.accuracy,it.speed, it.at) }
             TripBridge.fixNow = { model.fix }
             TripBridge.paid = { leg, key ->
                 model.activeJourney?.let { model.activeJourney = it.copy(paid = it.paid + (leg to key)) }
@@ -1061,7 +1061,7 @@ fun requestLocationOnce(
     ctx: Context,
     onFail: () -> Unit = {},
     requireFresh: Boolean = false,
-    onResult: (Pair<Double, Double>) -> Unit,
+    onResult: (Double, Double, Double) -> Unit,
 ): () -> Unit {
     val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     if (lm == null || !hasLocationPermission(ctx)) { onFail(); return {} }
@@ -1078,7 +1078,7 @@ fun requestLocationOnce(
         }
         bestAccuracy = accuracy
         reported = true
-        onResult(l.latitude to l.longitude)
+        onResult(l.latitude, l.longitude, l.accuracy.toDouble())
     }
     if (!requireFresh) {
         lastKnown(ctx)?.takeIf { System.currentTimeMillis() / 1000 - it.fixTime() in 0..120 }?.let { offer(it, false) }
@@ -1087,7 +1087,7 @@ fun requestLocationOnce(
         // the way Moovit plans from where the phone already knows you are.
         lastKnown(ctx)?.takeIf {
             System.currentTimeMillis() / 1000 - it.fixTime() in 0..120 && it.hasAccuracy() && it.accuracy in 0f..GOOD_FIX_M
-        }?.let { onResult(it.latitude to it.longitude); return {} }
+        }?.let { onResult(it.latitude, it.longitude, it.accuracy.toDouble()); return {} }
     }
 
     var done = false

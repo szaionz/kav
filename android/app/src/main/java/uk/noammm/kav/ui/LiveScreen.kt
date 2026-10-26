@@ -263,7 +263,7 @@ fun LiveScreen(model: KavModel) {
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it }) {
             locGranted = true
-            requestLocationOnce(ctx) { model.locate(it.first, it.second) }
+            requestLocationOnce(ctx) { lat,lon,accuracy -> model.locate(lat,lon,accuracy) }
         }
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -274,7 +274,7 @@ fun LiveScreen(model: KavModel) {
         if (!locGranted) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
-                requestLocationOnce(ctx) { model.locate(it.first, it.second) }
+                requestLocationOnce(ctx) {lat,lon,accuracy -> model.locate(lat,lon,accuracy)  }
                 delay(120_000)
             }
         }
@@ -642,7 +642,7 @@ fun LiveScreen(model: KavModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Chip(T("Use my location", "השתמשו במיקום שלי"), false) {
-                if (hasLocationPermission(ctx)) { locGranted = true; requestLocationOnce(ctx) { model.locate(it.first, it.second) } }
+                if (hasLocationPermission(ctx)) { locGranted = true; requestLocationOnce(ctx) { lat,lon,accuracy -> model.locate(lat,lon,accuracy)  } }
                 else ask.launch(LOCATION_PERMISSIONS)
             }
             Text(T("showing central Tel Aviv", "מוצג מרכז תל אביב"), style = DisplayItalic, fontSize = 12.sp, color = K.dim)

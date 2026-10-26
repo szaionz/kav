@@ -120,7 +120,7 @@ class TripService : Service() {
     }
 
     private fun onFix(location: Location) {
-        val f = Fix(location.latitude, location.longitude, location.fixTime(), location.speed)
+        val f = Fix(location.latitude, location.longitude, location.accuracy.toDouble(), location.fixTime(), location.speed)
         fix = f
         // The watch timer stops while the screen sleeps, and the fix can carry the trip past the last stop's
         // window before it runs again: every fix checks first, so "get off" isn't skipped.
