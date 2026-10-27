@@ -315,11 +315,11 @@ class OpenTripPlannerRoutingProvider(val endpoint: String): RoutingProvider{
             val primaryItineraryRideLegs = primaryItinerary.legs.filter { it.kind == Moovit.LegKind.RIDE }
             val alternatives = ArrayList<ArrayList<Moovit.Leg>>()
             val alternativeShortNames = ArrayList<HashSet<String>>()
-            val lineChoices = ArrayList<ArrayList<Int>>()
+            val lineChoices = ArrayList<HashSet<Int>>()
             for (i in primaryItineraryRideLegs.indices) {
                 alternatives.add (ArrayList())
                 alternativeShortNames.add(HashSet<String>())
-                lineChoices.add(arrayListOf(primaryItineraryRideLegs[i].lineId))
+                lineChoices.add(hashSetOf(primaryItineraryRideLegs[i].lineId))
             }
             for (i in 1..<iternaryList.size) {
                 val secondaryItinerary = iternaryList[i]
@@ -328,15 +328,15 @@ class OpenTripPlannerRoutingProvider(val endpoint: String): RoutingProvider{
                     if (!alternativeShortNames[j].contains(element.shortName)) {
                         alternativeShortNames[j].add(element.shortName)
                         alternatives[j].add(element)
-                        lineChoices[j].add(element.lineId)
                     }
+                    lineChoices[j].add(element.lineId)
                 }
             }
             outItinerairies.add(
                 primaryItinerary.copy(
                     legs=primaryItinerary.legs.map{
                         when {
-                            (it.kind==Moovit.LegKind.RIDE) -> ( it.copy(alternatives=alternatives.removeAt(0), alternativeLineIds =lineChoices.removeAt(0) ))
+                            (it.kind==Moovit.LegKind.RIDE) -> ( it.copy(alternatives=alternatives.removeAt(0), alternativeLineIds =lineChoices.removeAt(0).toList() ))
                             else -> it
                         }
                     }
