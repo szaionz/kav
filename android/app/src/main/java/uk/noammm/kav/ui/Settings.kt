@@ -87,10 +87,9 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
             PaymentsSection(model)
         }
 
-        Group(T("What a plan may show", "מה מסלול יכול לכלול"))
-        FilterRows(model.filters) { f, on -> model.setFilter(ctx, f, on) }
 
-        Group(T("What a card shows", "מה מוצג בכרטיס"))
+
+        Group(T("UI", "ממשק משתמש"))
         Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3), verticalArrangement = Arrangement.spacedBy(K.gap1)) {
             SwitchRow(
                 T("Emissions", "פליטות"),
@@ -111,7 +110,11 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
                 stopPhotos,
                 { on -> stopPhotos = on; Prefs.setStopPhotos(ctx, on) },
             ) { PhotoGlyph(if (stopPhotos) K.text else K.dim, 18.dp) }
+            Column(Modifier.fillMaxWidth()) { DeclutterChoice() }
+
         }
+        Group(T("What a plan may show", "מה מסלול יכול לכלול"))
+        FilterRows(model.filters) { f, on -> model.setFilter(ctx, f, on) }
 
         Group(T("Trip alerts", "התראות בנסיעה"))
         Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) {
@@ -142,8 +145,7 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
 
         LookChoices(inset = K.gap4) { Group(it) }
 
-        Group(T("Interface", "ממשק"))
-        Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) { DeclutterChoice() }
+//        Group(T("Interface", "ממשק"))
 
         Group(T("Map", "מפה"))
         MapChoices()
