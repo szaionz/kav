@@ -1,5 +1,6 @@
 package uk.noammm.kav.ui
 
+import android.content.Context
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import uk.noammm.kav.ActiveJourney
 import uk.noammm.kav.KavModel
+import uk.noammm.kav.Prefs
 import uk.noammm.kav.RecentTrip
 import uk.noammm.kav.data.Moovit
 import java.text.SimpleDateFormat
@@ -113,25 +115,42 @@ internal fun HomeScreen(
                         onRemove = { f -> save(favourites.filter { it.id != f.id }) },
                     )
                 }
-                item {
-                    val journey = model.activeJourney
-                    if (journey != null) JourneyCard(model, journey, onResume)
-                    else Column(
-                        Modifier.fillMaxWidth().panel(K.rCard)
-                            .padding(K.gap5),
-                        verticalArrangement = Arrangement.spacedBy(K.gap2),
-                    ) {
-                        Text(T("Ready when you are", "מוכנים כשתרצו"), fontSize = 21.sp, color = K.text, fontWeight = FontWeight.SemiBold)
-                        Note(T("Choose a destination to see your route and what to do next.", "בחרו יעד כדי לראות את המסלול ואת הצעד הבא."))
-                    }
-                }
-                // Paying, the tickets still running and the history, in one card.
-                item {
-                    Column(Modifier.fillMaxWidth().panel(K.rCard)) {
-                        HomeShortcut(T("Pay for a ride", "תשלום על נסיעה"), { drawQr() }, Modifier.fillMaxWidth(), framed = false) {
-                            model.payOpen = true
+                    item {
+                        val journey = model.activeJourney
+                        if (journey != null) JourneyCard(model, journey, ctx, onResume)
+                        else if (!Prefs.declutterUi(ctx)) Column(
+                            Modifier.fillMaxWidth().panel(K.rCard)
+                                .padding(K.gap5),
+                            verticalArrangement = Arrangement.spacedBy(K.gap2),
+                        ) {
+                            Text(
+                                T("Ready when you are", "מוכנים כשתרצו"),
+                                fontSize = 21.sp,
+                                color = K.text,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Note(
+                                T(
+                                    "Choose a destination to see your route and what to do next.",
+                                    "בחרו יעד כדי לראות את המסלול ואת הצעד הבא."
+                                )
+                            )
                         }
-                        if (Payer.signedIn) PayTicketsCard(model)
+                    }
+                // Paying, the tickets still running and the history, in one card.
+                if (Prefs.payments(ctx) ){
+                    item {
+                        Column(Modifier.fillMaxWidth().panel(K.rCard)) {
+                            HomeShortcut(
+                                T("Pay for a ride", "תשלום על נסיעה"),
+                                { drawQr() },
+                                Modifier.fillMaxWidth(),
+                                framed = false
+                            ) {
+                                model.payOpen = true
+                            }
+                            if (Payer.signedIn) PayTicketsCard(model)
+                        }
                     }
                 }
                 if (recentTrips.isNotEmpty()) item {
@@ -153,15 +172,28 @@ internal fun HomeScreen(
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(K.gap3)) {
-                        Row(
-                            Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                            horizontalArrangement = Arrangement.spacedBy(K.gap3),
-                        ) {
-                            HomeShortcut(T("Found a bug?", "מצאתם באג?"), { drawBug() }, Modifier.weight(1f).fillMaxHeight()) {
-                                openLink(ctx, "$REPO_URL/issues/new?labels=bug&title=bug%3A%20")
-                            }
-                            HomeShortcut(T("Request a feature?", "רוצים פיצ'ר חדש?"), { drawBulb() }, Modifier.weight(1f).fillMaxHeight()) {
-                                openLink(ctx, "$REPO_URL/issues/new?labels=enhancement&title=feature%3A%20")
+                        if (!Prefs.declutterUi(ctx)) {
+                            Row(
+                                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(K.gap3),
+                            ) {
+                                HomeShortcut(
+                                    T("Found a bug?", "מצאתם באג?"),
+                                    { drawBug() },
+                                    Modifier.weight(1f).fillMaxHeight()
+                                ) {
+                                    openLink(ctx, "$REPO_URL/issues/new?labels=bug&title=bug%3A%20")
+                                }
+                                HomeShortcut(
+                                    T("Request a feature?", "רוצים פיצ'ר חדש?"),
+                                    { drawBulb() },
+                                    Modifier.weight(1f).fillMaxHeight()
+                                ) {
+                                    openLink(
+                                        ctx,
+                                        "$REPO_URL/issues/new?labels=enhancement&title=feature%3A%20"
+                                    )
+                                }
                             }
                         }
                         HomeShortcut(T("Buy me a coffee", "קנו לי קפה"), { drawCoffee() }, Modifier.fillMaxWidth()) {
@@ -232,7 +264,7 @@ private fun tripWhen(at: Long): String {
 }
 
 @Composable
-private fun JourneyCard(model: KavModel, journey: ActiveJourney, onResume: () -> Unit) {
+private fun JourneyCard(model: KavModel, journey: ActiveJourney, ctx: Context, onResume: () -> Unit) {
     PlannedPlatforms(journey.trip, journey.resolved)
     var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     LaunchedEffect(journey.trip) {
@@ -283,7 +315,7 @@ private fun JourneyCard(model: KavModel, journey: ActiveJourney, onResume: () ->
                         model.activeJourney?.takeIf { it.trip === journey.trip }
                             ?.let { model.activeJourney = it.copy(chosen = it.chosen + (leg to option)) }
                     },
-                    pay = { leg, ride -> TripPay(model, leg, ride, journey.resolved) },
+                    pay = { leg, ride -> if (Prefs.payments(ctx) )TripPay(model, leg, ride, journey.resolved) },
                     report = { model.report = it })
             }
         }

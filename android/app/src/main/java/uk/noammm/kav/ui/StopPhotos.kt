@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import uk.noammm.kav.Prefs
 import uk.noammm.kav.data.Moovit
 import uk.noammm.kav.data.Net
 import java.io.File
@@ -102,19 +103,21 @@ object StopPhotos {
         return if (code > 0) "c$code" else "p%.5f,%.5f".format(java.util.Locale.US, net.lat[stop], net.lon[stop])
     }
 
-    fun idNow(net: Net, stop: Int): Int? = ids[keyOf(net, stop)]
+    fun idNow(net: Net, stop: Int): Int? = if (Prefs.stopPhotos(app)) ids[keyOf(net, stop)] else null
 
     // Searched for and not found, as opposed to a search that failed.
-    fun knownMissing(net: Net, stop: Int) = keyOf(net, stop) in misses
+    fun knownMissing(net: Net, stop: Int) = (keyOf(net, stop) in misses) || (!Prefs.stopPhotos(app))
 
     // A stop seen on a line's pattern comes with its code, which settles its id for good.
     fun learn(stops: List<Moovit.StopInfo>) {
-        for (st in stops) {
-            val key = "c" + (st.code.toIntOrNull()?.takeIf { it > 0 } ?: continue)
-            if (ids[key] == st.id) continue
-            ids[key] = st.id
-            misses.remove(key)
-            appendId(key, st.id)
+        if (Prefs.stopPhotos(app)) {
+            for (st in stops) {
+                val key = "c" + (st.code.toIntOrNull()?.takeIf { it > 0 } ?: continue)
+                if (ids[key] == st.id) continue
+                ids[key] = st.id
+                misses.remove(key)
+                appendId(key, st.id)
+            }
         }
     }
 
@@ -129,30 +132,47 @@ object StopPhotos {
         return true
     }
 
-    fun thumbNow(stopId: Int): Bitmap? =
-        urls[stopId]?.small()?.firstNotNullOfOrNull { thumbs.get(it) }
+    fun thumbNow(stopId: Int): Bitmap? {
+        if (!Prefs.stopPhotos(app)) return null
+        return urls[stopId]?.small()?.firstNotNullOfOrNull { thumbs.get(it) }
+    }
 
     // Null while it isn't known, or Moovit couldn't be asked.
-    fun hasPhotosNow(stopId: Int): Boolean? = urls[stopId]?.takeIf(::fresh)?.small()?.isNotEmpty()
+    fun hasPhotosNow(stopId: Int): Boolean? {
+        if (!Prefs.stopPhotos(app)) return false
+        return urls[stopId]?.takeIf(::fresh)?.small()?.isNotEmpty()
+    }
 
-    suspend fun hasPhotos(stopId: Int): Boolean? = if (stopId <= 0) null else urlsOf(stopId)?.small()?.isNotEmpty()
+    suspend fun hasPhotos(stopId: Int): Boolean? {
+        if (!Prefs.stopPhotos (app)) return false
+        if (stopId <= 0) return null else return urlsOf(stopId)?.small()?.isNotEmpty()
+    }
 
     suspend fun idOf(net: Net, stop: Int): Int? = withContext(Dispatchers.IO) {
-        val key = keyOf(net, stop)
-        ids[key]?.let { return@withContext it }
-        if (key in misses) return@withContext null
-        try {
-            val lat = net.lat[stop].toDouble()
-            val lon = net.lon[stop].toDouble()
-            val id = Moovit.searchStopId(Online.open(lat to lon), net.name.getOrElse(stop) { "" }, lat to lon) { hLat, hLon ->
-                owns(net, stop, hLat, hLon)
+        if (!Prefs.stopPhotos(app)) null
+        else {
+            val key = keyOf(net, stop)
+            ids[key]?.let { return@withContext it }
+            if (key in misses) return@withContext null
+            try {
+                val lat = net.lat[stop].toDouble()
+                val lon = net.lon[stop].toDouble()
+                val id = Moovit.searchStopId(
+                    Online.open(lat to lon),
+                    net.name.getOrElse(stop) { "" },
+                    lat to lon
+                ) { hLat, hLon ->
+                    owns(net, stop, hLat, hLon)
+                }
+                if (id == null) misses.add(key) else {
+                    ids[key] = id; appendId(key, id)
+                }
+                id
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
             }
-            if (id == null) misses.add(key) else { ids[key] = id; appendId(key, id) }
-            id
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
         }
     }
 
@@ -221,7 +241,7 @@ object StopPhotos {
     }
 
     suspend fun thumb(stopId: Int): Bitmap? {
-        if (stopId <= 0) return null
+        if (stopId <= 0 || !Prefs.stopPhotos(app)) return null
         thumbNow(stopId)?.let { return it }
         for (url in urlsOf(stopId)?.small().orEmpty()) {
             thumbs.get(url)?.let { return it }
@@ -239,16 +259,24 @@ object StopPhotos {
     }
 
     suspend fun full(stopId: Int): Bitmap? = withContext(Dispatchers.IO) {
-        urlsOf(stopId)?.list.orEmpty().take(3).firstNotNullOfOrNull { url ->
-            fulls.get(url) ?: ensureFile(url)?.let { decode(it, FULL_PX) }?.also { fulls.put(url, it) }
+        if (!Prefs.stopPhotos(app)) null
+        else {
+            urlsOf(stopId)?.list.orEmpty().take(3).firstNotNullOfOrNull { url ->
+                fulls.get(url) ?: ensureFile(url)?.let { decode(it, FULL_PX) }
+                    ?.also { fulls.put(url, it) }
+            }
         }
     }
 
     fun prefetchNet(net: Net, stops: List<Int>) {
-        for (s in stops) scope.launch { idOf(net, s)?.let { thumb(it) } }
+        if (Prefs.stopPhotos(app)) {
+            for (s in stops) scope.launch { idOf(net, s)?.let { thumb(it) } }
+        }
     }
 
     fun prefetchIds(stopIds: List<Int>) {
-        for (id in stopIds.distinct()) if (id > 0) scope.launch { thumb(id) }
+        if (Prefs.stopPhotos(app)) {
+            for (id in stopIds.distinct()) if (id > 0) scope.launch { thumb(id) }
+        }
     }
 }

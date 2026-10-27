@@ -115,7 +115,7 @@ fun TripDetailScreen(
             isTracking && target != null ->
                 LiveLocationScreen(target.first, target.second, r) { tracking = null }
             isNavigating -> NavigateScreen(
-                model, trip, r, fromLabel, toLabel,
+                model, trip, r, fromLabel, toLabel, ctx=ctx,
                 onStop = { navigating = false; onEnd() },
                 onExit = onHome,
                 onPlan = { navigating = false; planFromNavigation = true },

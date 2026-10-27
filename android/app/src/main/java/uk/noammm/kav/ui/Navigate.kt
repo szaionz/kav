@@ -2,6 +2,7 @@
 
 package uk.noammm.kav.ui
 
+import android.content.Context
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import uk.noammm.kav.KavModel
+import uk.noammm.kav.Prefs
 import uk.noammm.kav.data.KavLive
 import uk.noammm.kav.data.Moovit
 import java.util.Date
@@ -181,6 +183,7 @@ fun NavigateScreen(
     r: Moovit.Resolved,
     fromLabel: String,
     toLabel: String,
+    ctx: Context,
     onStop: () -> Unit,
     onExit: () -> Unit = onStop,
     onPlan: () -> Unit = onExit,
@@ -304,7 +307,7 @@ fun NavigateScreen(
                             steps[page], r, active = page == currentStep, now = now,
                             chosen = chosen, fix = fix,
                             onChoose = ::choose,
-                            pay = { leg, ride -> TripPay(model, leg, ride, r) },
+                            pay = { leg, ride -> if (Prefs.payments(ctx) )TripPay(model, leg, ride, r) },
                             report = { model.report = it },
                         )
                     }
