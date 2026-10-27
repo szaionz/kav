@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -83,16 +85,17 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) { RoutingRows() }
 
         // Most used first, the ones set once and forgotten after.
+        Group(T("Payments", "תשלומים"))
+        Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) { PaymentsChoice() }
         if (Payer.signedIn) {
-            Group(T("Payments", "תשלומים"))
+            Spacer(Modifier.height(K.gap2))
             PaymentsSection(model)
         }
 
-        Group(T("What a plan may show", "מה מסלול יכול לכלול"))
-        FilterRows(model.filters) { f, on -> model.setFilter(ctx, f, on) }
 
-        Group(T("What a card shows", "מה מוצג בכרטיס"))
-        Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) {
+
+        Group(T("UI", "ממשק משתמש"))
+        Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3), verticalArrangement = Arrangement.spacedBy(K.gap1)) {
             SwitchRow(
                 T("Emissions", "פליטות"),
                 T(
@@ -102,7 +105,21 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
                 Shown.co2,
                 { on -> Shown.co2 = on; Prefs.setShowCo2(ctx, on) },
             ) { GlobeGlyph(if (Shown.co2) K.text else K.dim, K.surface1, 18.dp) }
+            var stopPhotos by remember { mutableStateOf(Prefs.stopPhotos(ctx)) }
+            SwitchRow(
+                T("Stop photos", "תמונות תחנות"),
+                T(
+                    "A photo of the stop on its card, when Kav has one.",
+                    "תמונה של התחנה בכרטיס שלה, כשיש ל-Kav תמונה.",
+                ),
+                stopPhotos,
+                { on -> stopPhotos = on; Prefs.setStopPhotos(ctx, on) },
+            ) { PhotoGlyph(if (stopPhotos) K.text else K.dim, 18.dp) }
+            Column(Modifier.fillMaxWidth()) { DeclutterChoice() }
+
         }
+        Group(T("What a plan may show", "מה מסלול יכול לכלול"))
+        FilterRows(model.filters) { f, on -> model.setFilter(ctx, f, on) }
 
         Group(T("Trip alerts", "התראות בנסיעה"))
         Column(Modifier.fillMaxWidth().padding(horizontal = K.gap3)) {
@@ -132,6 +149,8 @@ fun SettingsScreen(model: KavModel, onClose: () -> Unit) {
         ClockChoice(ctx)
 
         LookChoices(inset = K.gap4) { Group(it) }
+
+//        Group(T("Interface", "ממשק"))
 
         Group(T("Map", "מפה"))
         MapChoices()
@@ -264,6 +283,38 @@ internal fun LiveSourceRow() {
         KavLive.chosen,
         { on -> KavLive.chosen = on; Prefs.setLiveFromKav(ctx, on) },
     ) { LiveGlyph(if (KavLive.chosen) K.text else K.dim, 18.dp) }
+}
+
+// Payments on or off. Nothing reads it yet.
+@Composable
+private fun PaymentsChoice() {
+    val ctx = LocalContext.current
+    var payments by remember { mutableStateOf(Prefs.payments(ctx)) }
+    SwitchRow(
+        T("Enable payments", "הפעלת תשלומים"),
+        T(
+            "Paying for rides with your Rav-Pass account.",
+            "תשלום על נסיעות עם חשבון רב-פס שלכם.",
+        ),
+        payments,
+        { on -> payments = on; Prefs.setPayments(ctx, on) },
+    ) { CardGlyph(if (payments) K.text else K.dim, 18.dp) }
+}
+
+// A calmer screen, with less on it. Nothing reads it yet.
+@Composable
+private fun DeclutterChoice() {
+    val ctx = LocalContext.current
+    var declutter by remember { mutableStateOf(Prefs.declutterUi(ctx)) }
+    SwitchRow(
+        T("Declutter UI", "ממשק נקי"),
+        T(
+            "Less detail on each screen, for a calmer view.",
+            "פחות פרטים בכל מסך, למראה רגוע יותר.",
+        ),
+        declutter,
+        { on -> declutter = on; Prefs.setDeclutterUi(ctx, on) },
+    ) { DeclutterGlyph(if (declutter) K.text else K.dim, 18.dp) }
 }
 
 @Composable
@@ -516,6 +567,50 @@ internal fun openStreetView(ctx: android.content.Context, lat: Double, lon: Doub
         .setPackage("com.google.android.apps.maps").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { ctx.startActivity(app) }.onFailure {
         openLink(ctx, "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=$lat,$lon&query=$lat,$lon")
+    }
+}
+
+@Composable
+private fun PhotoGlyph(tint: Color, size: Dp = 18.dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width; val h = this.size.height; val sw = w * .09f
+        drawRoundRect(
+            tint, Offset(w * .08f, h * .16f), Size(w * .84f, h * .68f), CornerRadius(w * .10f),
+            style = Stroke(sw),
+        )
+        drawCircle(tint, w * .08f, Offset(w * .32f, h * .36f), style = Stroke(sw))
+        val hill = Path().apply {
+            moveTo(w * .14f, h * .74f)
+            lineTo(w * .38f, h * .48f)
+            lineTo(w * .55f, h * .66f)
+            lineTo(w * .68f, h * .54f)
+            lineTo(w * .86f, h * .74f)
+        }
+        drawPath(hill, tint, style = Stroke(sw, cap = StrokeCap.Round))
+    }
+}
+
+@Composable
+private fun CardGlyph(tint: Color, size: Dp = 18.dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width; val h = this.size.height; val sw = w * .09f
+        drawRoundRect(
+            tint, Offset(w * .06f, h * .22f), Size(w * .88f, h * .56f), CornerRadius(w * .10f),
+            style = Stroke(sw),
+        )
+        drawLine(tint, Offset(w * .10f, h * .40f), Offset(w * .90f, h * .40f), sw)
+        drawLine(tint, Offset(w * .14f, h * .64f), Offset(w * .36f, h * .64f), sw, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun DeclutterGlyph(tint: Color, size: Dp = 18.dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width; val h = this.size.height; val sw = w * .09f
+        for ((i, end) in listOf(.86f, .60f, .74f).withIndex()) {
+            val y = h * (.24f + i * .26f)
+            drawLine(tint, Offset(w * .12f, y), Offset(w * end, y), sw, StrokeCap.Round)
+        }
     }
 }
 
